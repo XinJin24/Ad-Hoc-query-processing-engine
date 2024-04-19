@@ -1,7 +1,7 @@
 import subprocess
 def read_arguments_from_file():
     # file_path = input("Enter the file path: ")
-    file_path = r"C:\Users\jinxi\Downloads\MF.txt"
+    file_path = r"C:\Users\jinxi\git_repos\Ad-Hoc-query-processing-engine\input1.txt"
     try:
         with open(file_path, 'r', encoding='utf-8') as file:
             content = file.readlines()
