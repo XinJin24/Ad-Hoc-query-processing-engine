@@ -6,8 +6,6 @@ Team Members
 
 Technology Stack
 
-This project leverages several technologies and libraries to facilitate Ad-Hoc query processing with Python and PostgreSQL:
-
     Python: Main programming language.
     PostgreSQL: Database system used for storing and querying data.
     Psycopg2: Python-PostgreSQL Database Adapter for connecting and operating on the database.
