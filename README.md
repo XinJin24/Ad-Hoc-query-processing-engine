@@ -1,4 +1,4 @@
-CS562 Team Project: Ad-Hoc Query Processing Engine
+# CS562 Team Project: Ad-Hoc Query Processing Engine
 Team Members
 
     Su Zhang
