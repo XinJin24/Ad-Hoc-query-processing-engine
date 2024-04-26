@@ -25,9 +25,29 @@ def query():
     
     mf_structure = collections.defaultdict(H)
     for row in rows:
-        key_cust = row[0]
-        if not (mf_structure[(key_cust)]['cust']):
-            mf_structure[(key_cust)]['cust'] = key_cust
+        group_cust = row[0]
+        if row[5] == '’NY’':
+            if not (mf_structure[(group_cust)]['cust']):
+                mf_structure[(group_cust)]['cust'] = group_cust
+            mf_structure[(group_cust)]['1_sum_quant'] += row[6]
+            if '1_avg_quant_sum' not in mf_structure[(group_cust)]:
+                mf_structure[(group_cust)]['1_avg_quant_sum'] = 0
+                mf_structure[(group_cust)]['1_avg_quant_count'] = 0
+            mf_structure[(group_cust)]['1_avg_quant_sum'] += row[6]
+            mf_structure[(group_cust)]['1_avg_quant_count']  += 1
+        if row[5] == '’NJ’':
+            if not (mf_structure[(group_cust)]['cust']):
+                mf_structure[(group_cust)]['cust'] = group_cust
+            mf_structure[(group_cust)]['2_sum_quant'] += row[6]
+        if row[5] == '’CT’':
+            if not (mf_structure[(group_cust)]['cust']):
+                mf_structure[(group_cust)]['cust'] = group_cust
+            mf_structure[(group_cust)]['3_sum_quant'] += row[6]
+            if '3_avg_quant_sum' not in mf_structure[(group_cust)]:
+                mf_structure[(group_cust)]['3_avg_quant_sum'] = 0
+                mf_structure[(group_cust)]['3_avg_quant_count'] = 0
+            mf_structure[(group_cust)]['3_avg_quant_sum'] += row[6]
+            mf_structure[(group_cust)]['3_avg_quant_count']  += 1
 
     _global = []
     return tabulate.tabulate(_global,

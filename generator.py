@@ -142,12 +142,12 @@ def generate_h_table(arguments):
     class_definition += "        self.attributes = {}\n"
 
     for attr in grouping_attributes:
-        formatted_attr = f"_{attr}" if attr[0].isdigit() else attr
+        formatted_attr = f"{attr}" if attr[0].isdigit() else attr
         class_definition += f"        self.attributes['{formatted_attr}'] = None\n"
 
     for func in aggregate_functions:
-        formatted_func = f"_{func}" if func[0].isdigit() else func
-        class_definition += f"        self.attributes['{formatted_func}'] = None\n"
+        formatted_func = f"{func}" if func[0].isdigit() else func
+        class_definition += f"        self.attributes['{formatted_func}'] = 0\n"
 
     class_definition += """
     def __getitem__(self, key):
@@ -158,6 +158,9 @@ def generate_h_table(arguments):
 
     def __repr__(self):
         return f'H({self.attributes})'
+        
+    def __contains__(self, key):
+        return key in self.attributes
     """
 
     filename = "_H_class_generated.py"
@@ -172,7 +175,7 @@ def initializing_H_table(grouping_attributes, aggregate_functions):
     indentation = "    "
     generated_code = []
 
-    formatted_group_keys = ", ".join([f"key_{attr}" for attr in grouping_attributes])
+    formatted_group_keys = ", ".join([f"group_{attr}" for attr in grouping_attributes])
     group_dict_access = f"mf_structure[({formatted_group_keys})]"
 
     if 0 in aggregate_functions:
@@ -187,19 +190,16 @@ def initializing_H_table(grouping_attributes, aggregate_functions):
     schema_indices = {'cust': '0', 'prod': '1', 'day': '2', 'month': '3',
                       'year': '4', 'state': '5', 'quant': '6', "date": '7'}
     for attribute in grouping_attributes:
-        generated_code.append(f"{indentation * 2}key_{attribute} = row[{schema_indices[attribute]}]")
+        generated_code.append(f"{indentation * 2}group_{attribute} = row[{schema_indices[attribute]}]")
 
     if 0 in aggregate_functions:
         aggregate_attr_set = set(info[2] for info in aggregate_info)
         for aggregate_attr in aggregate_attr_set:
             generated_code.append(f"{indentation * 2}{aggregate_attr} = row[{schema_indices[aggregate_attr]}]")
 
-    grouping_conditions = " and ".join([f"{group_dict_access}['{attr}']" for attr in grouping_attributes])
-    generated_code.append(f"{indentation * 2}if not ({grouping_conditions}):")
-    for attribute in grouping_attributes:
-        generated_code.append(f"{indentation * 3}{group_dict_access}['{attribute}'] = key_{attribute}")
-
     return "\n".join(generated_code)
+
+
 def templating_aggregates(aggregate_definitions):
     aggregate_mapping = {}
     for definition in aggregate_definitions:
@@ -210,33 +210,95 @@ def templating_aggregates(aggregate_definitions):
 
         if grouping_variable_index not in aggregate_mapping:
             aggregate_mapping[grouping_variable_index] = []
-        aggregate_mapping[grouping_variable_index].append((definition, aggregate_function, attribute_name))
+        aggregate_mapping[grouping_variable_index].append(
+            (definition, grouping_variable_index, aggregate_function, attribute_name))
 
     return aggregate_mapping
 
-def scan_to_compute_aggregates(aggregate_definitions):
-    aggregate_mapping = {}
-    for definition in aggregate_definitions:
-        parts = definition.split("_")
-        grouping_variable_index = int(parts[0])
-        aggregate_function = parts[1]
-        attribute_name = parts[2]
 
-        if grouping_variable_index not in aggregate_mapping:
-            aggregate_mapping[grouping_variable_index] = []
-        aggregate_mapping[grouping_variable_index].append((definition, aggregate_function, attribute_name))
+def scan_to_compute_aggregates(grouping_attributes, aggregate_mapping,  select_conditions, schema_indices):
+    generated_code = []
+    generated_code.append("")
+    group_attr = "(" + ", ".join(["group_" +
+                                  group_attr for group_attr in grouping_attributes]) + ")"
+    for index, aggregates in aggregate_mapping.items():
+        filtered_select_conditions = [cond for cond in select_conditions if cond.startswith(str(index))]
+        code_for_aggregates = generate_aggregation_code(group_attr, aggregates, filtered_select_conditions, schema_indices)
+        generated_code.append(code_for_aggregates)
 
-    return aggregate_mapping
+    return "\n".join(generated_code)
+
+
+def generate_aggregation_code(group_attr, aggregates, select_conditions, schema_indices):
+    generated_code = []
+    indentation = "    "
+    print(schema_indices)
+    print(aggregates)
+    print(select_conditions)
+
+    for condition in select_conditions:
+        field_condition = condition.split('.')[1]
+        field, value = field_condition.split('=')
+        field_index = schema_indices[field]
+        generated_code.append(f"{indentation * 2}if row[{field_index}] == '{value.strip()}':")
+
+    formatted_group_keys = ", ".join([f"group_{attr}" for attr in grouping_attributes])
+    group_dict_access = f"mf_structure[({formatted_group_keys})]"
+    grouping_conditions = " and ".join([f"{group_dict_access}['{attr}']" for attr in grouping_attributes])
+    generated_code.append(f"{indentation * 3}if not ({grouping_conditions}):")
+
+    for attribute in grouping_attributes:
+        generated_code.append(f"{indentation * 4}{group_dict_access}['{attribute}'] = group_{attribute}")
+    for agg_name, grouping_variable_index, agg_type, agg_attr in aggregates:
+        print(agg_name, grouping_variable_index, agg_type, agg_attr)
+        target_index = schema_indices[agg_attr]
+        group_key = f"mf_structure[{group_attr}]['" + agg_name + "']"
+
+        print(group_key)
+        if agg_type == "sum":
+            generated_code.append(f"{indentation * 3}{group_key} += row[{target_index}]")
+        elif agg_type == "avg":
+            generated_code.extend([
+                f"{indentation * 3}if '{agg_name}_sum' not in mf_structure[{group_attr}]:",
+                f"{indentation * 4}mf_structure[{group_attr}]['{agg_name}_sum'] = 0",
+                f"{indentation * 4}mf_structure[{group_attr}]['{agg_name}_count'] = 0",
+                f"{indentation * 3}mf_structure[{group_attr}]['{agg_name}_sum'] += row[{target_index}]",
+                f"{indentation * 3}mf_structure[{group_attr}]['{agg_name}_count']  += 1"
+            ])
+        elif agg_type == "max":
+            generated_code.extend([
+                f"{indentation * 3}if '{agg_name}' not in mf_structure[{group_attr}] or row[{target_index}] > {group_key}:",
+                f"{indentation * 4}{group_key} = row[{target_index}]"
+            ])
+        elif agg_type == "min":
+            generated_code.extend([
+                f"{indentation * 3}if '{agg_name}' not in mf_structure[{group_attr}] or row[{target_index}] < {group_key}:",
+                f"{indentation * 4}{group_key} = row[{target_index}]"
+            ])
+        elif agg_type == "count":
+            generated_code.extend([
+                f"{indentation * 3}if '{agg_name}' not in mf_structure[{group_attr}]:",
+                f"{indentation * 4}{group_key} = 1",
+                f"{indentation * 3}else:",
+                f"{indentation * 4}{group_key} += 1"
+            ])
+
+    return "\n".join(generated_code)
 
 
 if "__main__" == __name__:
     body = ""
+    schema_indices = {'cust': 0, 'prod': 1, 'day': 2, 'month': 3, 'year': 4, 'state': 5, 'quant': 6, 'date': 7}
     phi_arguments = step1()
     grouping_attributes = phi_arguments['GROUPING ATTRIBUTES(V):']
     aggregate_functions = phi_arguments['F-VECT([F]):']
+    select_conditions = phi_arguments['SELECT CONDITION-VECT([σ]):']
+
     aggregate_functions = templating_aggregates(aggregate_functions)
     file_name = generate_h_table(phi_arguments)
 
+    print(aggregate_functions)
     body += initializing_H_table(grouping_attributes, aggregate_functions)
-    body += scan_to_compute_aggregates()
+    body += scan_to_compute_aggregates(grouping_attributes, aggregate_functions, select_conditions, schema_indices)
+
     step2(body)
