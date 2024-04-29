@@ -180,6 +180,7 @@ def initializing_H_table(grouping_attributes, aggregate_functions):
 
     if 0 in aggregate_functions:
         aggregate_info = [(f[0], f[1], f[2]) for f in aggregate_functions[0]]
+        print(aggregate_info)
         for aggregate in aggregate_info:
             if "avg" in aggregate[1]:
                 generated_code.append(f"{indentation}count_{aggregate[0]} = collections.defaultdict(int)")
@@ -232,15 +233,48 @@ def scan_to_compute_aggregates(grouping_attributes, aggregate_mapping,  select_c
 def generate_aggregation_code(group_attr, aggregates, select_conditions, schema_indices):
     generated_code = []
     indentation = "    "
-    print(schema_indices)
-    print(aggregates)
-    print(select_conditions)
 
+    condition_list = []
     for condition in select_conditions:
         field_condition = condition.split('.')[1]
-        field, value = field_condition.split('=')
-        field_index = schema_indices[field]
-        generated_code.append(f"{indentation * 2}if row[{field_index}] == '{value.strip()}':")
+        if '>=' in field_condition:
+            field, value = field_condition.split('>=')
+            field_index = schema_indices[field]
+            if "'" in value or '’' in value:
+                condition_list.append(f"row[{field_index}] >= '{value.strip()[1:-1]}'")
+            else:
+                condition_list.append(f"row[{field_index}] >= {value}")
+        if '<=' in field_condition:
+            field, value = field_condition.split('<=')
+            field_index = schema_indices[field]
+            if "'" in value or '’' in value:
+                condition_list.append(f"row[{field_index}] <= '{value.strip()[1:-1]}'")
+            else:
+                condition_list.append(f"row[{field_index}] <= {value}")
+        if '>' in field_condition:
+            field, value = field_condition.split('>')
+            field_index = schema_indices[field]
+            if "'" in value or '’' in value:
+                condition_list.append(f"row[{field_index}] > '{value.strip()[1:-1]}'")
+            else:
+                condition_list.append(f"row[{field_index}] > {value}")
+        if '<' in field_condition:
+            field, value = field_condition.split('<')
+            field_index = schema_indices[field]
+            if "'" in value or '’' in value:
+                condition_list.append(f"row[{field_index}] < '{value.strip()[1:-1]}'")
+            else:
+                condition_list.append(f"row[{field_index}] < {value}")
+        if '=' in field_condition:
+            field, value = field_condition.split('=')
+            field_index = schema_indices[field]
+            if "'" in value or '’' in value:
+                condition_list.append(f"row[{field_index}] == '{value.strip()[1:-1]}'")
+            else:
+                condition_list.append(f"row[{field_index}] == {value}")
+    if condition_list:
+        combined_conditions = ' and '.join(condition_list)
+        generated_code.append(f"{indentation * 2}if {combined_conditions}:")
 
     formatted_group_keys = ", ".join([f"group_{attr}" for attr in grouping_attributes])
     group_dict_access = f"mf_structure[({formatted_group_keys})]"
@@ -250,11 +284,9 @@ def generate_aggregation_code(group_attr, aggregates, select_conditions, schema_
     for attribute in grouping_attributes:
         generated_code.append(f"{indentation * 4}{group_dict_access}['{attribute}'] = group_{attribute}")
     for agg_name, grouping_variable_index, agg_type, agg_attr in aggregates:
-        print(agg_name, grouping_variable_index, agg_type, agg_attr)
         target_index = schema_indices[agg_attr]
         group_key = f"mf_structure[{group_attr}]['" + agg_name + "']"
 
-        print(group_key)
         if agg_type == "sum":
             generated_code.append(f"{indentation * 3}{group_key} += row[{target_index}]")
         elif agg_type == "avg":
@@ -296,9 +328,12 @@ if "__main__" == __name__:
 
     aggregate_functions = templating_aggregates(aggregate_functions)
     file_name = generate_h_table(phi_arguments)
-
     print(aggregate_functions)
     body += initializing_H_table(grouping_attributes, aggregate_functions)
     body += scan_to_compute_aggregates(grouping_attributes, aggregate_functions, select_conditions, schema_indices)
+
+    generated_code = []
+    body += "\n"
+    body += "\n".join(["    print(mf_structure)"])
 
     step2(body)

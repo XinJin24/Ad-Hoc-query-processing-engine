@@ -26,7 +26,7 @@ def query():
     mf_structure = collections.defaultdict(H)
     for row in rows:
         group_cust = row[0]
-        if row[5] == '’NY’':
+        if row[5] == 'NY' and row[6] > 100:
             if not (mf_structure[(group_cust)]['cust']):
                 mf_structure[(group_cust)]['cust'] = group_cust
             mf_structure[(group_cust)]['1_sum_quant'] += row[6]
@@ -35,11 +35,11 @@ def query():
                 mf_structure[(group_cust)]['1_avg_quant_count'] = 0
             mf_structure[(group_cust)]['1_avg_quant_sum'] += row[6]
             mf_structure[(group_cust)]['1_avg_quant_count']  += 1
-        if row[5] == '’NJ’':
+        if row[5] == 'NJ':
             if not (mf_structure[(group_cust)]['cust']):
                 mf_structure[(group_cust)]['cust'] = group_cust
             mf_structure[(group_cust)]['2_sum_quant'] += row[6]
-        if row[5] == '’CT’':
+        if row[5] == 'CT':
             if not (mf_structure[(group_cust)]['cust']):
                 mf_structure[(group_cust)]['cust'] = group_cust
             mf_structure[(group_cust)]['3_sum_quant'] += row[6]
@@ -48,6 +48,7 @@ def query():
                 mf_structure[(group_cust)]['3_avg_quant_count'] = 0
             mf_structure[(group_cust)]['3_avg_quant_sum'] += row[6]
             mf_structure[(group_cust)]['3_avg_quant_count']  += 1
+    print(mf_structure)
 
     _global = []
     return tabulate.tabulate(_global,
