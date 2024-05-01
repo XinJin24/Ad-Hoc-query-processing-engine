@@ -4,7 +4,9 @@ class H:
         self.attributes['cust'] = None
         self.attributes['1_sum_quant'] = 0
         self.attributes['1_avg_quant'] = 0
+        self.attributes['1_max_quant'] = 0
         self.attributes['2_sum_quant'] = 0
+        self.attributes['2_avg_quant'] = 0
         self.attributes['3_sum_quant'] = 0
         self.attributes['3_avg_quant'] = 0
 

@@ -1,4 +1,5 @@
 import subprocess
+import re
 
 
 def read_arguments_from_file():
@@ -180,7 +181,6 @@ def initializing_H_table(grouping_attributes, aggregate_functions):
 
     if 0 in aggregate_functions:
         aggregate_info = [(f[0], f[1], f[2]) for f in aggregate_functions[0]]
-        print(aggregate_info)
         for aggregate in aggregate_info:
             if "avg" in aggregate[1]:
                 generated_code.append(f"{indentation}count_{aggregate[0]} = collections.defaultdict(int)")
@@ -217,25 +217,49 @@ def templating_aggregates(aggregate_definitions):
     return aggregate_mapping
 
 
-def scan_to_compute_aggregates(grouping_attributes, aggregate_mapping,  select_conditions, schema_indices):
+def is_aggregate_condition(value, aggregate_mappings):
+    aggregate_identifiers = set(func[0] for funcs in aggregate_mappings.values() for func in funcs)
+    return value in aggregate_identifiers
+
+
+def need_more_scan(predicates, aggregates):
+    aggregate_names = set()
+    for agg_list in aggregates.values():
+        for agg in agg_list:
+            aggregate_names.add(agg[0])
+    for predicate in predicates:
+        parts = re.split(r'([<>=]{1,2})', predicate)
+        if len(parts) < 3:
+            continue
+        right_hand_side = parts[2].strip().replace('’', "'").replace('“', '"').strip("'\"")
+        if right_hand_side in aggregate_names:
+            return True
+    return False
+
+
+def scan_to_compute_aggregates(grouping_attributes, aggregate_mapping, predicate_conditions, schema_indices):
+    print(grouping_attributes, aggregate_mapping, predicate_conditions, schema_indices)
     generated_code = []
     generated_code.append("")
     group_attr = "(" + ", ".join(["group_" +
                                   group_attr for group_attr in grouping_attributes]) + ")"
+
     for index, aggregates in aggregate_mapping.items():
-        filtered_select_conditions = [cond for cond in select_conditions if cond.startswith(str(index))]
-        code_for_aggregates = generate_aggregation_code(group_attr, aggregates, filtered_select_conditions, schema_indices)
+        filtered_select_conditions = [cond for cond in predicate_conditions if cond.startswith(str(index))]
+        code_for_aggregates = generate_aggregation_code(group_attr, aggregates, filtered_select_conditions,
+                                                        schema_indices, aggregate_mapping)
         generated_code.append(code_for_aggregates)
 
     return "\n".join(generated_code)
 
 
-def generate_aggregation_code(group_attr, aggregates, select_conditions, schema_indices):
+def generate_aggregation_code(group_attr, aggregates, predicate_conditions, schema_indices, all_aggregates):
     generated_code = []
     indentation = "    "
 
     condition_list = []
-    for condition in select_conditions:
+
+    for condition in predicate_conditions:
         field_condition = condition.split('.')[1]
         if '>=' in field_condition:
             field, value = field_condition.split('>=')
@@ -243,35 +267,49 @@ def generate_aggregation_code(group_attr, aggregates, select_conditions, schema_
             if "'" in value or '’' in value:
                 condition_list.append(f"row[{field_index}] >= '{value.strip()[1:-1]}'")
             else:
-                condition_list.append(f"row[{field_index}] >= {value}")
-        if '<=' in field_condition:
+                if not is_aggregate_condition(value, all_aggregates):
+                    condition_list.append(f"row[{field_index}] >= {value}")
+        elif '<=' in field_condition:
             field, value = field_condition.split('<=')
             field_index = schema_indices[field]
             if "'" in value or '’' in value:
                 condition_list.append(f"row[{field_index}] <= '{value.strip()[1:-1]}'")
             else:
-                condition_list.append(f"row[{field_index}] <= {value}")
-        if '>' in field_condition:
+                if not is_aggregate_condition(value, all_aggregates):
+
+                    condition_list.append(f"row[{field_index}] <= {value}")
+        elif '!=' in field_condition:
+            field, value = field_condition.split('!=')
+            field_index = schema_indices[field]
+            if "'" in value or '’' in value:
+                condition_list.append(f"row[{field_index}] != '{value.strip()[1:-1]}'")
+            else:
+                if not is_aggregate_condition(value, all_aggregates):
+                    condition_list.append(f"row[{field_index}] != {value}")
+        elif '>' in field_condition:
             field, value = field_condition.split('>')
             field_index = schema_indices[field]
             if "'" in value or '’' in value:
                 condition_list.append(f"row[{field_index}] > '{value.strip()[1:-1]}'")
             else:
-                condition_list.append(f"row[{field_index}] > {value}")
-        if '<' in field_condition:
+                if not is_aggregate_condition(value, all_aggregates):
+                    condition_list.append(f"row[{field_index}] > {value}")
+        elif '<' in field_condition:
             field, value = field_condition.split('<')
             field_index = schema_indices[field]
             if "'" in value or '’' in value:
                 condition_list.append(f"row[{field_index}] < '{value.strip()[1:-1]}'")
             else:
-                condition_list.append(f"row[{field_index}] < {value}")
-        if '=' in field_condition:
+                if not is_aggregate_condition(value, all_aggregates):
+                    condition_list.append(f"row[{field_index}] < {value}")
+        elif '=' in field_condition:
             field, value = field_condition.split('=')
             field_index = schema_indices[field]
             if "'" in value or '’' in value:
                 condition_list.append(f"row[{field_index}] == '{value.strip()[1:-1]}'")
             else:
-                condition_list.append(f"row[{field_index}] == {value}")
+                if not is_aggregate_condition(value, all_aggregates):
+                    condition_list.append(f"row[{field_index}] == {value}")
     if condition_list:
         combined_conditions = ' and '.join(condition_list)
         generated_code.append(f"{indentation * 2}if {combined_conditions}:")
@@ -295,7 +333,7 @@ def generate_aggregation_code(group_attr, aggregates, select_conditions, schema_
                 f"{indentation * 4}mf_structure[{group_attr}]['{agg_name}_sum'] = 0",
                 f"{indentation * 4}mf_structure[{group_attr}]['{agg_name}_count'] = 0",
                 f"{indentation * 3}mf_structure[{group_attr}]['{agg_name}_sum'] += row[{target_index}]",
-                f"{indentation * 3}mf_structure[{group_attr}]['{agg_name}_count']  += 1"
+                f"{indentation * 3}mf_structure[{group_attr}]['{agg_name}_count'] += 1"
             ])
         elif agg_type == "max":
             generated_code.extend([
@@ -318,19 +356,245 @@ def generate_aggregation_code(group_attr, aggregates, select_conditions, schema_
     return "\n".join(generated_code)
 
 
+def generate_aggregation_code_for_second_scan(group_attr, aggregates, predicate_conditions, schema_indices, all_aggregates):
+    generated_code = []
+    indentation = "    "
+
+    condition_list = []
+    print(group_attr)
+    print(aggregates)
+    print(predicate_conditions)
+    print(schema_indices)
+    print(all_aggregates)
+
+    for condition in predicate_conditions:
+        field_condition = condition.split('.')[1]
+        if '>=' in field_condition:
+            field, value = field_condition.split('>=')
+            field_index = schema_indices[field]
+            if "'" in value or '’' in value:
+                condition_list.append(f"row[{field_index}] >= '{value.strip()[1:-1]}'")
+            else:
+                if is_aggregate_condition(value, all_aggregates):
+                    condition_list.append(f"row[{field_index}] >= mf_structure[({group_attr})]['{value}']")
+        elif '<=' in field_condition:
+            field, value = field_condition.split('<=')
+            field_index = schema_indices[field]
+            if "'" in value or '’' in value:
+                condition_list.append(f"row[{field_index}] <= '{value.strip()[1:-1]}'")
+            else:
+                if is_aggregate_condition(value, all_aggregates):
+                    condition_list.append(f"row[{field_index}] <= mf_structure[({group_attr})]['{value}']")
+        elif '!=' in field_condition:
+            field, value = field_condition.split('!=')
+            field_index = schema_indices[field]
+            if "'" in value or '’' in value:
+                condition_list.append(f"row[{field_index}] != '{value.strip()[1:-1]}'")
+            else:
+                if is_aggregate_condition(value, all_aggregates):
+                    condition_list.append(f"row[{field_index}] != mf_structure[({group_attr})]['{value}']")
+        elif '>' in field_condition:
+            field, value = field_condition.split('>')
+            field_index = schema_indices[field]
+            if "'" in value or '’' in value:
+                condition_list.append(f"row[{field_index}] > '{value.strip()[1:-1]}'")
+            else:
+                if is_aggregate_condition(value, all_aggregates):
+                    condition_list.append(f"row[{field_index}] > mf_structure[({group_attr})]['{value}']")
+        elif '<' in field_condition:
+            field, value = field_condition.split('<')
+            field_index = schema_indices[field]
+            if "'" in value or '’' in value:
+                condition_list.append(f"row[{field_index}] < '{value.strip()[1:-1]}'")
+            else:
+                if is_aggregate_condition(value, all_aggregates):
+                    condition_list.append(f"row[{field_index}] < mf_structure[({group_attr})]['{value}']")
+        elif '=' in field_condition:
+            field, value = field_condition.split('=')
+            field_index = schema_indices[field]
+            if "'" in value or '’' in value:
+                condition_list.append(f"row[{field_index}] == '{value.strip()[1:-1]}'")
+            else:
+                if is_aggregate_condition(value, all_aggregates):
+                    condition_list.append(f"row[{field_index}] == mf_structure[({group_attr})]['{value}']")
+    if condition_list:
+        combined_conditions = ' and '.join(condition_list)
+        generated_code.append(f"{indentation * 2}if {combined_conditions}:")
+
+    formatted_group_keys = ", ".join([f"group_{attr}" for attr in grouping_attributes])
+    group_dict_access = f"mf_structure_0[({formatted_group_keys})]"
+    grouping_conditions = " and ".join([f"{group_dict_access}['{attr}']" for attr in grouping_attributes])
+    generated_code.append(f"{indentation * 3}if not ({grouping_conditions}):")
+
+    for attribute in grouping_attributes:
+        generated_code.append(f"{indentation * 4}{group_dict_access}['{attribute}'] = group_{attribute}")
+    for agg_name, grouping_variable_index, agg_type, agg_attr in aggregates:
+        target_index = schema_indices[agg_attr]
+        group_key = f"mf_structure_0[{group_attr}]['" + agg_name + "']"
+
+        if agg_type == "sum":
+            generated_code.append(f"{indentation * 3}{group_key} += row[{target_index}]")
+        elif agg_type == "avg":
+            generated_code.extend([
+                f"{indentation * 3}if '{agg_name}_sum' not in mf_structure_0[{group_attr}]:",
+                f"{indentation * 4}mf_structure_0[{group_attr}]['{agg_name}_sum'] = 0",
+                f"{indentation * 4}mf_structure_0[{group_attr}]['{agg_name}_count'] = 0",
+                f"{indentation * 3}mf_structure_0[{group_attr}]['{agg_name}_sum'] += row[{target_index}]",
+                f"{indentation * 3}mf_structure_0[{group_attr}]['{agg_name}_count'] += 1"
+            ])
+        elif agg_type == "max":
+            generated_code.extend([
+                f"{indentation * 3}if '{agg_name}' not in mf_structure_0[{group_attr}] or row[{target_index}] > {group_key}:",
+                f"{indentation * 4}{group_key} = row[{target_index}]"
+            ])
+        elif agg_type == "min":
+            generated_code.extend([
+                f"{indentation * 3}if '{agg_name}' not in mf_structure_0[{group_attr}] or row[{target_index}] < {group_key}:",
+                f"{indentation * 4}{group_key} = row[{target_index}]"
+            ])
+        elif agg_type == "count":
+            generated_code.extend([
+                f"{indentation * 3}if '{agg_name}' not in mf_structure_0[{group_attr}]:",
+                f"{indentation * 4}{group_key} = 1",
+                f"{indentation * 3}else:",
+                f"{indentation * 4}{group_key} += 1"
+            ])
+
+    return "\n".join(generated_code)
+
+def extract_variable_that_needs_second_scan(select_conditions, aggregates):
+    variable_indices = set()
+    aggregate_names = set(agg[0] for aggs in aggregates.values() for agg in aggs)
+    operator_regex = r'[<>=!]{1,2}'
+    for condition in select_conditions:
+        parts = re.split(operator_regex, condition)
+        if len(parts) > 1:
+            left_hand_side = parts[0].strip()
+            right_hand_side = parts[1].strip()
+            if any(agg in right_hand_side for agg in aggregate_names):
+                match = re.match(r'(\d+)\.', left_hand_side)
+                if match:
+                    variable_index = int(match.group(1))
+                    variable_indices.add(variable_index)
+    return variable_indices
+
+
+def second_scan(grouping_attributes, aggregate_functions, select_conditions, all_aggregate_functions, index):
+
+    generated_code = []
+    indentation = "    "
+    group_attr = "(" + ", ".join(["group_" +
+                                  group_attr for group_attr in grouping_attributes]) + ")"
+    generated_code.append(indentation+"for row in rows:")
+
+    schema_indices = {'cust': '0', 'prod': '1', 'day': '2', 'month': '3',
+                      'year': '4', 'state': '5', 'quant': '6', "date": '7'}
+
+    for attribute in grouping_attributes:
+        generated_code.append(f"{indentation * 2}group_{attribute} = row[{schema_indices[attribute]}]")
+
+    filtered_select_conditions = [cond for cond in select_conditions if cond.startswith(str(index))]
+    generated_code.append(generate_aggregation_code_for_second_scan(group_attr, aggregate_functions,
+                                                                    filtered_select_conditions, schema_indices,
+                                                                    all_aggregate_functions))
+
+    return "\n".join(generated_code)
+
+def get_average_script(h_table_name):
+    return f"""
+                \n
+    for key_tuple, h_object in {h_table_name}.items():
+        attributes = h_object.attributes
+        keys_to_remove = []
+        for attr_key in list(attributes.keys()):
+            if attr_key.endswith('_sum') and attr_key[:-4] + '_count' in attributes:
+                base_key = attr_key[:-4]
+                sum_value = attributes[attr_key]
+                count_key = base_key + '_count'
+                count_value = attributes[count_key]
+                if count_value != 0:
+                    attributes[base_key] = round(sum_value / count_value, 2)
+                else:
+                    attributes[base_key] = 0
+                keys_to_remove.extend([attr_key, count_key])
+        for key in keys_to_remove:
+            del attributes[key]
+    """
+def override_tables():
+
+    return f"""
+    \n
+    for key, updated_h_object in mf_structure_0.items():
+        if key in mf_structure:
+            original_h_object = mf_structure[key]
+            for attr, value in updated_h_object.attributes.items():
+                if value != 0:
+                    original_h_object.attributes[attr] = value
+        else:
+            mf_structure[key] = updated_h_object
+        """
+def update_mf_structure(original_structure, updates):
+    for key, updated_h_object in updates.items():
+        if key in original_structure:
+            original_h_object = original_structure[key]
+            for attr, value in updated_h_object.attributes.items():
+                original_h_object.attributes[attr] = value
+        else:
+            original_structure[key] = updated_h_object
+
+
 if "__main__" == __name__:
     body = ""
+    indentation = "    "
     schema_indices = {'cust': 0, 'prod': 1, 'day': 2, 'month': 3, 'year': 4, 'state': 5, 'quant': 6, 'date': 7}
     phi_arguments = step1()
     grouping_attributes = phi_arguments['GROUPING ATTRIBUTES(V):']
     aggregate_functions = phi_arguments['F-VECT([F]):']
     select_conditions = phi_arguments['SELECT CONDITION-VECT([σ]):']
+    n_of_grouping = phi_arguments["NUMBER OF GROUPING VARIABLES(n):"]
+    select_attributes = phi_arguments["SELECT ATTRIBUTE(S):"]
+    having_condition = phi_arguments["HAVING_CONDITION(G):"]
 
     aggregate_functions = templating_aggregates(aggregate_functions)
     file_name = generate_h_table(phi_arguments)
-    print(aggregate_functions)
     body += initializing_H_table(grouping_attributes, aggregate_functions)
+
     body += scan_to_compute_aggregates(grouping_attributes, aggregate_functions, select_conditions, schema_indices)
+
+    avg_added = False
+
+    for key, values in aggregate_functions.items():
+        if avg_added:
+            break
+        for value in values:
+            if '_avg_' in value[0]:
+                body += get_average_script("mf_structure")
+        avg_added = True
+        break
+    if need_more_scan(select_conditions, aggregate_functions):
+        generated_code = []
+        body += "\n"
+        body += "\n".join(["    # second scan"])
+        body += "\n"
+        body += "\n".join(["    mf_structure_0 = collections.defaultdict(H)"])
+        re_scan_vars = extract_variable_that_needs_second_scan(select_conditions, aggregate_functions)
+        filtered_aggregates = {key: aggregates for key, aggregates in aggregate_functions.items() if key in re_scan_vars}
+        for i in range(1, int(len(re_scan_vars)+1)):
+            body += "\n"
+            body += second_scan(grouping_attributes, aggregate_functions.get(i), select_conditions, aggregate_functions, i)
+        avg_added = False
+        for key, values in aggregate_functions.items():
+            if avg_added:
+                break
+            for value in values:
+                if '_avg_' in value[0]:
+                    body += get_average_script("mf_structure_0")
+            avg_added = True
+            break
+        body += override_tables()
+
+    group_attr = "(" + ", ".join(["group_" +
+                                  group_attr for group_attr in grouping_attributes]) + ")"
 
     generated_code = []
     body += "\n"

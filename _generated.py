@@ -26,7 +26,7 @@ def query():
     mf_structure = collections.defaultdict(H)
     for row in rows:
         group_cust = row[0]
-        if row[5] == 'NY' and row[6] > 100:
+        if row[5] == 'NY':
             if not (mf_structure[(group_cust)]['cust']):
                 mf_structure[(group_cust)]['cust'] = group_cust
             mf_structure[(group_cust)]['1_sum_quant'] += row[6]
@@ -34,11 +34,18 @@ def query():
                 mf_structure[(group_cust)]['1_avg_quant_sum'] = 0
                 mf_structure[(group_cust)]['1_avg_quant_count'] = 0
             mf_structure[(group_cust)]['1_avg_quant_sum'] += row[6]
-            mf_structure[(group_cust)]['1_avg_quant_count']  += 1
+            mf_structure[(group_cust)]['1_avg_quant_count'] += 1
+            if '1_max_quant' not in mf_structure[(group_cust)] or row[6] > mf_structure[(group_cust)]['1_max_quant']:
+                mf_structure[(group_cust)]['1_max_quant'] = row[6]
         if row[5] == 'NJ':
             if not (mf_structure[(group_cust)]['cust']):
                 mf_structure[(group_cust)]['cust'] = group_cust
             mf_structure[(group_cust)]['2_sum_quant'] += row[6]
+            if '2_avg_quant_sum' not in mf_structure[(group_cust)]:
+                mf_structure[(group_cust)]['2_avg_quant_sum'] = 0
+                mf_structure[(group_cust)]['2_avg_quant_count'] = 0
+            mf_structure[(group_cust)]['2_avg_quant_sum'] += row[6]
+            mf_structure[(group_cust)]['2_avg_quant_count'] += 1
         if row[5] == 'CT':
             if not (mf_structure[(group_cust)]['cust']):
                 mf_structure[(group_cust)]['cust'] = group_cust
@@ -47,7 +54,82 @@ def query():
                 mf_structure[(group_cust)]['3_avg_quant_sum'] = 0
                 mf_structure[(group_cust)]['3_avg_quant_count'] = 0
             mf_structure[(group_cust)]['3_avg_quant_sum'] += row[6]
-            mf_structure[(group_cust)]['3_avg_quant_count']  += 1
+            mf_structure[(group_cust)]['3_avg_quant_count'] += 1
+                
+
+    for key_tuple, h_object in mf_structure.items():
+        attributes = h_object.attributes
+        keys_to_remove = []
+        for attr_key in list(attributes.keys()):
+            if attr_key.endswith('_sum') and attr_key[:-4] + '_count' in attributes:
+                base_key = attr_key[:-4]
+                sum_value = attributes[attr_key]
+                count_key = base_key + '_count'
+                count_value = attributes[count_key]
+                if count_value != 0:
+                    attributes[base_key] = round(sum_value / count_value, 2)
+                else:
+                    attributes[base_key] = 0
+                keys_to_remove.extend([attr_key, count_key])
+        for key in keys_to_remove:
+            del attributes[key]
+    
+    # second scan
+    mf_structure_0 = collections.defaultdict(H)
+    for row in rows:
+        group_cust = row[0]
+        if row[5] == 'NY' and row[6] >= mf_structure[((group_cust))]['1_max_quant']:
+            if not (mf_structure_0[(group_cust)]['cust']):
+                mf_structure_0[(group_cust)]['cust'] = group_cust
+            mf_structure_0[(group_cust)]['1_sum_quant'] += row[6]
+            if '1_avg_quant_sum' not in mf_structure_0[(group_cust)]:
+                mf_structure_0[(group_cust)]['1_avg_quant_sum'] = 0
+                mf_structure_0[(group_cust)]['1_avg_quant_count'] = 0
+            mf_structure_0[(group_cust)]['1_avg_quant_sum'] += row[6]
+            mf_structure_0[(group_cust)]['1_avg_quant_count'] += 1
+            if '1_max_quant' not in mf_structure_0[(group_cust)] or row[6] > mf_structure_0[(group_cust)]['1_max_quant']:
+                mf_structure_0[(group_cust)]['1_max_quant'] = row[6]
+    for row in rows:
+        group_cust = row[0]
+        if row[6] <= mf_structure[((group_cust))]['1_avg_quant'] and row[5] == 'NJ':
+            if not (mf_structure_0[(group_cust)]['cust']):
+                mf_structure_0[(group_cust)]['cust'] = group_cust
+            mf_structure_0[(group_cust)]['2_sum_quant'] += row[6]
+            if '2_avg_quant_sum' not in mf_structure_0[(group_cust)]:
+                mf_structure_0[(group_cust)]['2_avg_quant_sum'] = 0
+                mf_structure_0[(group_cust)]['2_avg_quant_count'] = 0
+            mf_structure_0[(group_cust)]['2_avg_quant_sum'] += row[6]
+            mf_structure_0[(group_cust)]['2_avg_quant_count'] += 1
+                
+
+    for key_tuple, h_object in mf_structure_0.items():
+        attributes = h_object.attributes
+        keys_to_remove = []
+        for attr_key in list(attributes.keys()):
+            if attr_key.endswith('_sum') and attr_key[:-4] + '_count' in attributes:
+                base_key = attr_key[:-4]
+                sum_value = attributes[attr_key]
+                count_key = base_key + '_count'
+                count_value = attributes[count_key]
+                if count_value != 0:
+                    attributes[base_key] = round(sum_value / count_value, 2)
+                else:
+                    attributes[base_key] = 0
+                keys_to_remove.extend([attr_key, count_key])
+        for key in keys_to_remove:
+            del attributes[key]
+    
+    
+
+    for key, updated_h_object in mf_structure_0.items():
+        if key in mf_structure:
+            original_h_object = mf_structure[key]
+            for attr, value in updated_h_object.attributes.items():
+                if value != 0:
+                    original_h_object.attributes[attr] = value
+        else:
+            mf_structure[key] = updated_h_object
+        
     print(mf_structure)
 
     _global = []
