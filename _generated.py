@@ -3,6 +3,7 @@ import os
 import psycopg2
 import psycopg2.extras
 import tabulate
+from prettytable import PrettyTable
 from _H_class_generated import H
 import collections
 from dotenv import load_dotenv
@@ -30,13 +31,13 @@ def query():
             if not (mf_structure[(group_cust)]['cust']):
                 mf_structure[(group_cust)]['cust'] = group_cust
             mf_structure[(group_cust)]['1_sum_quant'] += row[6]
+            mf_structure[(group_cust)]['1.state'] = row[5]
             if '1_avg_quant_sum' not in mf_structure[(group_cust)]:
                 mf_structure[(group_cust)]['1_avg_quant_sum'] = 0
                 mf_structure[(group_cust)]['1_avg_quant_count'] = 0
             mf_structure[(group_cust)]['1_avg_quant_sum'] += row[6]
             mf_structure[(group_cust)]['1_avg_quant_count'] += 1
-            if '1_max_quant' not in mf_structure[(group_cust)] or row[6] > mf_structure[(group_cust)]['1_max_quant']:
-                mf_structure[(group_cust)]['1_max_quant'] = row[6]
+            mf_structure[(group_cust)]['1.state'] = row[5]
         if row[5] == 'NJ':
             if not (mf_structure[(group_cust)]['cust']):
                 mf_structure[(group_cust)]['cust'] = group_cust
@@ -78,28 +79,17 @@ def query():
     mf_structure_0 = collections.defaultdict(H)
     for row in rows:
         group_cust = row[0]
-        if row[5] == 'NY' and row[6] >= mf_structure[((group_cust))]['1_max_quant']:
+        if row[5] == 'NY' and row[6] >= mf_structure[((group_cust))]['1_avg_quant']:
             if not (mf_structure_0[(group_cust)]['cust']):
                 mf_structure_0[(group_cust)]['cust'] = group_cust
             mf_structure_0[(group_cust)]['1_sum_quant'] += row[6]
+            mf_structure_0[(group_cust)]['1.state'] = row[5]
             if '1_avg_quant_sum' not in mf_structure_0[(group_cust)]:
                 mf_structure_0[(group_cust)]['1_avg_quant_sum'] = 0
                 mf_structure_0[(group_cust)]['1_avg_quant_count'] = 0
             mf_structure_0[(group_cust)]['1_avg_quant_sum'] += row[6]
             mf_structure_0[(group_cust)]['1_avg_quant_count'] += 1
-            if '1_max_quant' not in mf_structure_0[(group_cust)] or row[6] > mf_structure_0[(group_cust)]['1_max_quant']:
-                mf_structure_0[(group_cust)]['1_max_quant'] = row[6]
-    for row in rows:
-        group_cust = row[0]
-        if row[6] <= mf_structure[((group_cust))]['1_avg_quant'] and row[5] == 'NJ':
-            if not (mf_structure_0[(group_cust)]['cust']):
-                mf_structure_0[(group_cust)]['cust'] = group_cust
-            mf_structure_0[(group_cust)]['2_sum_quant'] += row[6]
-            if '2_avg_quant_sum' not in mf_structure_0[(group_cust)]:
-                mf_structure_0[(group_cust)]['2_avg_quant_sum'] = 0
-                mf_structure_0[(group_cust)]['2_avg_quant_count'] = 0
-            mf_structure_0[(group_cust)]['2_avg_quant_sum'] += row[6]
-            mf_structure_0[(group_cust)]['2_avg_quant_count'] += 1
+            mf_structure_0[(group_cust)]['1.state'] = row[5]
                 
 
     for key_tuple, h_object in mf_structure_0.items():
@@ -130,7 +120,14 @@ def query():
         else:
             mf_structure[key] = updated_h_object
         
-    print(mf_structure)
+    x = PrettyTable()
+    x.field_names = ['cust','1.state','2_sum_quant','3_sum_quant']
+    for val in mf_structure.values():
+        if val["1_sum_quant"] > 2 * val["2_sum_quant"] or val["1_avg_quant"] > val["3_avg_quant"]:
+            row = [val[key] for key in x.field_names if key in val]
+            x.add_row(row)
+    print(x)
+
 
     _global = []
     return tabulate.tabulate(_global,

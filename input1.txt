@@ -1,5 +1,5 @@
 SELECT ATTRIBUTE(S):
-cust, 1_sum_quant, 2_sum_quant, 3_sum_quant
+cust, 1.state, 2_sum_quant, 3_sum_quant
 NUMBER OF GROUPING VARIABLES(n):
 3
 GROUPING ATTRIBUTES(V):
@@ -9,7 +9,6 @@ F-VECT([F]):
 SELECT CONDITION-VECT([σ]):
 1.state=’NY’
 1.quant>=1_avg_quant
-2.quant<=1_avg_quant
 2.state=’NJ’
 3.state=’CT’
 HAVING_CONDITION(G):

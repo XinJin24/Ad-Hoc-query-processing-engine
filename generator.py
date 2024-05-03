@@ -93,6 +93,7 @@ import os
 import psycopg2
 import psycopg2.extras
 import tabulate
+from prettytable import PrettyTable
 from _H_class_generated import H
 import collections
 from dotenv import load_dotenv
@@ -237,8 +238,8 @@ def need_more_scan(predicates, aggregates):
     return False
 
 
-def scan_to_compute_aggregates(grouping_attributes, aggregate_mapping, predicate_conditions, schema_indices):
-    print(grouping_attributes, aggregate_mapping, predicate_conditions, schema_indices)
+def scan_to_compute_aggregates(grouping_attributes, aggregate_mapping, predicate_conditions, schema_indices,
+                               formatted_select_attributes):
     generated_code = []
     generated_code.append("")
     group_attr = "(" + ", ".join(["group_" +
@@ -247,13 +248,15 @@ def scan_to_compute_aggregates(grouping_attributes, aggregate_mapping, predicate
     for index, aggregates in aggregate_mapping.items():
         filtered_select_conditions = [cond for cond in predicate_conditions if cond.startswith(str(index))]
         code_for_aggregates = generate_aggregation_code(group_attr, aggregates, filtered_select_conditions,
-                                                        schema_indices, aggregate_mapping)
+                                                        schema_indices, aggregate_mapping,
+                                                        formatted_select_attributes.get(index), index)
         generated_code.append(code_for_aggregates)
 
     return "\n".join(generated_code)
 
 
-def generate_aggregation_code(group_attr, aggregates, predicate_conditions, schema_indices, all_aggregates):
+def generate_aggregation_code(group_attr, aggregates, predicate_conditions, schema_indices, all_aggregates,
+                              select_attributes, index):
     generated_code = []
     indentation = "    "
 
@@ -276,7 +279,6 @@ def generate_aggregation_code(group_attr, aggregates, predicate_conditions, sche
                 condition_list.append(f"row[{field_index}] <= '{value.strip()[1:-1]}'")
             else:
                 if not is_aggregate_condition(value, all_aggregates):
-
                     condition_list.append(f"row[{field_index}] <= {value}")
         elif '!=' in field_condition:
             field, value = field_condition.split('!=')
@@ -327,6 +329,13 @@ def generate_aggregation_code(group_attr, aggregates, predicate_conditions, sche
 
         if agg_type == "sum":
             generated_code.append(f"{indentation * 3}{group_key} += row[{target_index}]")
+
+            if select_attributes:
+                for attr in select_attributes:
+                    generated_code.extend([
+                        f"{indentation * 3}mf_structure[{group_attr}]['{index}.{attr}'] = row[{schema_indices[attr]}]"
+                    ])
+
         elif agg_type == "avg":
             generated_code.extend([
                 f"{indentation * 3}if '{agg_name}_sum' not in mf_structure[{group_attr}]:",
@@ -335,16 +344,31 @@ def generate_aggregation_code(group_attr, aggregates, predicate_conditions, sche
                 f"{indentation * 3}mf_structure[{group_attr}]['{agg_name}_sum'] += row[{target_index}]",
                 f"{indentation * 3}mf_structure[{group_attr}]['{agg_name}_count'] += 1"
             ])
+            if select_attributes:
+                for attr in select_attributes:
+                    generated_code.extend([
+                        f"{indentation * 3}mf_structure[{group_attr}]['{index}.{attr}'] = row[{schema_indices[attr]}]"
+                    ])
         elif agg_type == "max":
             generated_code.extend([
                 f"{indentation * 3}if '{agg_name}' not in mf_structure[{group_attr}] or row[{target_index}] > {group_key}:",
                 f"{indentation * 4}{group_key} = row[{target_index}]"
             ])
+            if select_attributes:
+                for attr in select_attributes:
+                    generated_code.extend([
+                        f"{indentation * 3}mf_structure[{group_attr}]['{index}.{attr}'] = row[{schema_indices[attr]}]"
+                    ])
         elif agg_type == "min":
             generated_code.extend([
                 f"{indentation * 3}if '{agg_name}' not in mf_structure[{group_attr}] or row[{target_index}] < {group_key}:",
                 f"{indentation * 4}{group_key} = row[{target_index}]"
             ])
+            if select_attributes:
+                for attr in select_attributes:
+                    generated_code.extend([
+                        f"{indentation * 3}mf_structure[{group_attr}]['{index}.{attr}'] = row[{schema_indices[attr]}]"
+                    ])
         elif agg_type == "count":
             generated_code.extend([
                 f"{indentation * 3}if '{agg_name}' not in mf_structure[{group_attr}]:",
@@ -352,20 +376,20 @@ def generate_aggregation_code(group_attr, aggregates, predicate_conditions, sche
                 f"{indentation * 3}else:",
                 f"{indentation * 4}{group_key} += 1"
             ])
+            if select_attributes:
+                for attr in select_attributes:
+                    generated_code.extend([
+                        f"{indentation * 3}mf_structure[{group_attr}]['{index}.{attr}'] = row[{schema_indices[attr]}]"
+                    ])
 
     return "\n".join(generated_code)
 
 
-def generate_aggregation_code_for_second_scan(group_attr, aggregates, predicate_conditions, schema_indices, all_aggregates):
+def generate_aggregation_code_for_second_scan(group_attr, aggregates, predicate_conditions, schema_indices,
+                                              all_aggregates, index, select_attributes):
     generated_code = []
     indentation = "    "
-
     condition_list = []
-    print(group_attr)
-    print(aggregates)
-    print(predicate_conditions)
-    print(schema_indices)
-    print(all_aggregates)
 
     for condition in predicate_conditions:
         field_condition = condition.split('.')[1]
@@ -434,6 +458,11 @@ def generate_aggregation_code_for_second_scan(group_attr, aggregates, predicate_
 
         if agg_type == "sum":
             generated_code.append(f"{indentation * 3}{group_key} += row[{target_index}]")
+            if select_attributes:
+                for attr in select_attributes:
+                    generated_code.extend([
+                        f"{indentation * 3}mf_structure_0[{group_attr}]['{index}.{attr}'] = row[{schema_indices[attr]}]"
+                    ])
         elif agg_type == "avg":
             generated_code.extend([
                 f"{indentation * 3}if '{agg_name}_sum' not in mf_structure_0[{group_attr}]:",
@@ -442,16 +471,31 @@ def generate_aggregation_code_for_second_scan(group_attr, aggregates, predicate_
                 f"{indentation * 3}mf_structure_0[{group_attr}]['{agg_name}_sum'] += row[{target_index}]",
                 f"{indentation * 3}mf_structure_0[{group_attr}]['{agg_name}_count'] += 1"
             ])
+            if select_attributes:
+                for attr in select_attributes:
+                    generated_code.extend([
+                        f"{indentation * 3}mf_structure_0[{group_attr}]['{index}.{attr}'] = row[{schema_indices[attr]}]"
+                    ])
         elif agg_type == "max":
             generated_code.extend([
                 f"{indentation * 3}if '{agg_name}' not in mf_structure_0[{group_attr}] or row[{target_index}] > {group_key}:",
                 f"{indentation * 4}{group_key} = row[{target_index}]"
             ])
+            if select_attributes:
+                for attr in select_attributes:
+                    generated_code.extend([
+                        f"{indentation * 3}mf_structure_0[{group_attr}]['{index}.{attr}'] = row[{schema_indices[attr]}]"
+                    ])
         elif agg_type == "min":
             generated_code.extend([
                 f"{indentation * 3}if '{agg_name}' not in mf_structure_0[{group_attr}] or row[{target_index}] < {group_key}:",
                 f"{indentation * 4}{group_key} = row[{target_index}]"
             ])
+            if select_attributes:
+                for attr in select_attributes:
+                    generated_code.extend([
+                        f"{indentation * 3}mf_structure_0[{group_attr}]['{index}.{attr}'] = row[{schema_indices[attr]}]"
+                    ])
         elif agg_type == "count":
             generated_code.extend([
                 f"{indentation * 3}if '{agg_name}' not in mf_structure_0[{group_attr}]:",
@@ -459,8 +503,14 @@ def generate_aggregation_code_for_second_scan(group_attr, aggregates, predicate_
                 f"{indentation * 3}else:",
                 f"{indentation * 4}{group_key} += 1"
             ])
+            if select_attributes:
+                for attr in select_attributes:
+                    generated_code.extend([
+                        f"{indentation * 3}mf_structure_0[{group_attr}]['{index}.{attr}'] = row[{schema_indices[attr]}]"
+                    ])
 
     return "\n".join(generated_code)
+
 
 def extract_variable_that_needs_second_scan(select_conditions, aggregates):
     variable_indices = set()
@@ -479,13 +529,13 @@ def extract_variable_that_needs_second_scan(select_conditions, aggregates):
     return variable_indices
 
 
-def second_scan(grouping_attributes, aggregate_functions, select_conditions, all_aggregate_functions, index):
-
+def second_scan(grouping_attributes, aggregate_functions, select_conditions, all_aggregate_functions, index,
+                formatted_select_attributes):
     generated_code = []
     indentation = "    "
     group_attr = "(" + ", ".join(["group_" +
                                   group_attr for group_attr in grouping_attributes]) + ")"
-    generated_code.append(indentation+"for row in rows:")
+    generated_code.append(indentation + "for row in rows:")
 
     schema_indices = {'cust': '0', 'prod': '1', 'day': '2', 'month': '3',
                       'year': '4', 'state': '5', 'quant': '6', "date": '7'}
@@ -496,9 +546,11 @@ def second_scan(grouping_attributes, aggregate_functions, select_conditions, all
     filtered_select_conditions = [cond for cond in select_conditions if cond.startswith(str(index))]
     generated_code.append(generate_aggregation_code_for_second_scan(group_attr, aggregate_functions,
                                                                     filtered_select_conditions, schema_indices,
-                                                                    all_aggregate_functions))
+                                                                    all_aggregate_functions, index,
+                                                                    formatted_select_attributes.get(index)))
 
     return "\n".join(generated_code)
+
 
 def get_average_script(h_table_name):
     return f"""
@@ -520,8 +572,9 @@ def get_average_script(h_table_name):
         for key in keys_to_remove:
             del attributes[key]
     """
-def override_tables():
 
+
+def override_tables():
     return f"""
     \n
     for key, updated_h_object in mf_structure_0.items():
@@ -533,6 +586,8 @@ def override_tables():
         else:
             mf_structure[key] = updated_h_object
         """
+
+
 def update_mf_structure(original_structure, updates):
     for key, updated_h_object in updates.items():
         if key in original_structure:
@@ -541,6 +596,62 @@ def update_mf_structure(original_structure, updates):
                 original_h_object.attributes[attr] = value
         else:
             original_structure[key] = updated_h_object
+
+
+def parse_select_attributes(attributes):
+    parsed_attrs = {}
+    for attribute in attributes:
+        if "." in attribute:
+            level, attr_name = attribute.split(".")
+            level = int(level)
+            if level not in parsed_attrs:
+                parsed_attrs[level] = []
+            parsed_attrs[level].append(attr_name)
+    return parsed_attrs
+
+
+def parse_having(having_clause):
+    processed_conditions = []
+    condition_parts = re.split('(and|or)', having_clause)
+    comparison_operators = ["==", "<=", ">=", "<", ">", "!="]
+
+    for condition in condition_parts:
+        if condition in ['and', 'or']:
+            processed_conditions.append(condition)
+            continue
+        operator = next((op for op in comparison_operators if op in condition), "!=")
+        split_condition = re.split('({})'.format(operator), condition)
+        left_side, right_side = split_condition[0].strip(), split_condition[2].strip()
+        left_side_formatted = ' '.join(
+            ['val["' + element + '"]' if "." in element or "_" in element else element for element in
+             left_side.split()])
+        right_side_formatted = ' '.join(
+            ['val["' + element + '"]' if "." in element or "_" in element else element for element in
+             right_side.split()])
+        full_condition = f"{left_side_formatted} {operator} {right_side_formatted}"
+        processed_conditions.append(full_condition)
+
+    return ' '.join(processed_conditions)
+
+
+def generateOutput(S, G):
+    script = "\n"
+    indentation = "    "
+    my_string = ','.join(f"'{item}'" for item in S)
+    output = ""
+    output += (indentation + "x = PrettyTable()\n")
+    output += (indentation + f"x.field_names = [" + my_string + "]\n")
+    output += (indentation + "for val in mf_structure.values():\n")
+    if len(G) and len(G[0]):
+        having = parse_having(G[0])
+        output += (indentation * 2 + "if " + having + ":\n")
+
+    output += (indentation * 3 + "row = [val[key] for key in x.field_names if key in val]\n")
+    output += (indentation * 3 + "x.add_row(row)\n")
+
+    output += (indentation + "print(x)\n")
+    script += output
+    return script
 
 
 if "__main__" == __name__:
@@ -554,12 +665,14 @@ if "__main__" == __name__:
     n_of_grouping = phi_arguments["NUMBER OF GROUPING VARIABLES(n):"]
     select_attributes = phi_arguments["SELECT ATTRIBUTE(S):"]
     having_condition = phi_arguments["HAVING_CONDITION(G):"]
+    formatted_select_attributes = parse_select_attributes(select_attributes)
 
     aggregate_functions = templating_aggregates(aggregate_functions)
     file_name = generate_h_table(phi_arguments)
     body += initializing_H_table(grouping_attributes, aggregate_functions)
 
-    body += scan_to_compute_aggregates(grouping_attributes, aggregate_functions, select_conditions, schema_indices)
+    body += scan_to_compute_aggregates(grouping_attributes, aggregate_functions, select_conditions, schema_indices,
+                                       formatted_select_attributes)
 
     avg_added = False
 
@@ -571,6 +684,7 @@ if "__main__" == __name__:
                 body += get_average_script("mf_structure")
         avg_added = True
         break
+
     if need_more_scan(select_conditions, aggregate_functions):
         generated_code = []
         body += "\n"
@@ -578,10 +692,12 @@ if "__main__" == __name__:
         body += "\n"
         body += "\n".join(["    mf_structure_0 = collections.defaultdict(H)"])
         re_scan_vars = extract_variable_that_needs_second_scan(select_conditions, aggregate_functions)
-        filtered_aggregates = {key: aggregates for key, aggregates in aggregate_functions.items() if key in re_scan_vars}
-        for i in range(1, int(len(re_scan_vars)+1)):
+        filtered_aggregates = {key: aggregates for key, aggregates in aggregate_functions.items() if
+                               key in re_scan_vars}
+        for i in range(1, int(len(re_scan_vars) + 1)):
             body += "\n"
-            body += second_scan(grouping_attributes, aggregate_functions.get(i), select_conditions, aggregate_functions, i)
+            body += second_scan(grouping_attributes, aggregate_functions.get(i), select_conditions, aggregate_functions,
+                                i, formatted_select_attributes)
         avg_added = False
         for key, values in aggregate_functions.items():
             if avg_added:
@@ -592,12 +708,5 @@ if "__main__" == __name__:
             avg_added = True
             break
         body += override_tables()
-
-    group_attr = "(" + ", ".join(["group_" +
-                                  group_attr for group_attr in grouping_attributes]) + ")"
-
-    generated_code = []
-    body += "\n"
-    body += "\n".join(["    print(mf_structure)"])
-
+    body += generateOutput(select_attributes, having_condition)
     step2(body)
