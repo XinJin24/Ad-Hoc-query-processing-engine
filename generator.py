@@ -149,7 +149,10 @@ def generate_h_table(arguments):
 
     for func in aggregate_functions:
         formatted_func = f"{func}" if func[0].isdigit() else func
-        class_definition += f"        self.attributes['{formatted_func}'] = 0\n"
+        if "min" in formatted_func:
+            class_definition += f"        self.attributes['{formatted_func}'] = 10000\n"
+        else:
+            class_definition += f"        self.attributes['{formatted_func}'] = 0\n"
 
     class_definition += """
     def __getitem__(self, key):

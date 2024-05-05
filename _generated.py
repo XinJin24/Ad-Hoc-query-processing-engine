@@ -27,7 +27,7 @@ def query():
     mf_structure = collections.defaultdict(H)
     for row in rows:
         group_cust = row[0]
-        if row[5] == 'NY':
+        if row[0] == 'Dan':
             if not (mf_structure[(group_cust)]['cust']):
                 mf_structure[(group_cust)]['cust'] = group_cust
             mf_structure[(group_cust)]['1_sum_quant'] += row[6]
@@ -37,6 +37,12 @@ def query():
                 mf_structure[(group_cust)]['1_avg_quant_count'] = 0
             mf_structure[(group_cust)]['1_avg_quant_sum'] += row[6]
             mf_structure[(group_cust)]['1_avg_quant_count'] += 1
+            mf_structure[(group_cust)]['1.state'] = row[5]
+            if '1_max_quant' not in mf_structure[(group_cust)] or row[6] > mf_structure[(group_cust)]['1_max_quant']:
+                mf_structure[(group_cust)]['1_max_quant'] = row[6]
+            mf_structure[(group_cust)]['1.state'] = row[5]
+            if '1_min_quant' not in mf_structure[(group_cust)] or row[6] < mf_structure[(group_cust)]['1_min_quant']:
+                mf_structure[(group_cust)]['1_min_quant'] = row[6]
             mf_structure[(group_cust)]['1.state'] = row[5]
         if row[5] == 'NJ':
             if not (mf_structure[(group_cust)]['cust']):
@@ -79,7 +85,7 @@ def query():
     mf_structure_0 = collections.defaultdict(H)
     for row in rows:
         group_cust = row[0]
-        if row[5] == 'NY' and row[6] >= mf_structure[((group_cust))]['1_avg_quant']:
+        if row[0] == 'Dan' and row[6] > mf_structure[((group_cust))]['1_avg_quant']:
             if not (mf_structure_0[(group_cust)]['cust']):
                 mf_structure_0[(group_cust)]['cust'] = group_cust
             mf_structure_0[(group_cust)]['1_sum_quant'] += row[6]
@@ -89,6 +95,12 @@ def query():
                 mf_structure_0[(group_cust)]['1_avg_quant_count'] = 0
             mf_structure_0[(group_cust)]['1_avg_quant_sum'] += row[6]
             mf_structure_0[(group_cust)]['1_avg_quant_count'] += 1
+            mf_structure_0[(group_cust)]['1.state'] = row[5]
+            if '1_max_quant' not in mf_structure_0[(group_cust)] or row[6] > mf_structure_0[(group_cust)]['1_max_quant']:
+                mf_structure_0[(group_cust)]['1_max_quant'] = row[6]
+            mf_structure_0[(group_cust)]['1.state'] = row[5]
+            if '1_min_quant' not in mf_structure_0[(group_cust)] or row[6] < mf_structure_0[(group_cust)]['1_min_quant']:
+                mf_structure_0[(group_cust)]['1_min_quant'] = row[6]
             mf_structure_0[(group_cust)]['1.state'] = row[5]
                 
 
@@ -121,7 +133,7 @@ def query():
             mf_structure[key] = updated_h_object
         
     x = PrettyTable()
-    x.field_names = ['cust','1.state','2_sum_quant','3_sum_quant']
+    x.field_names = ['cust','1.state','2_sum_quant','3_sum_quant','1_avg_quant','1_max_quant','1_min_quant']
     for val in mf_structure.values():
         if val["1_sum_quant"] > 2 * val["2_sum_quant"] or val["1_avg_quant"] > val["3_avg_quant"]:
             row = [val[key] for key in x.field_names if key in val]
