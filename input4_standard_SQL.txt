@@ -1,0 +1,23 @@
+with q1 as(
+select cust, max(quant)as max_quant
+from sales
+where year = 2018
+group by cust
+),
+q2 as(
+select cust, max(quant)as max_quant
+from sales
+where year != 2018
+group by cust
+),
+q3 as(
+select sales.cust as cust, sales.prod as _1_prod
+from sales,q1
+where sales.cust = q1.cust and sales.quant = q1.max_quant and sales.year = 2018
+), q4 as (
+select sales.cust as cust, sales.prod as _2_prod
+from sales,q2
+where sales.cust = q2.cust and sales.quant = q2.max_quant and sales.year != 2018
+)
+
+select * from q3 natural join q4

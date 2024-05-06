@@ -16,8 +16,4 @@ group by cust
 )
 
 select * from q1 natural join q2 natural join q3
-
-
-
-
-
+where _1_sum_quant > 2 * _2_sum_quant or _1_avg_quant > _3_avg_quant

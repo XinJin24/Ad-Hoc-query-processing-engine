@@ -1,0 +1,34 @@
+with q1 as (
+	select cust, prod, max(quant) max_quant
+from sales
+where year = 2017
+group by cust, prod
+),
+q2 as(
+select q1.cust, q1.prod, q1.max_quant as _1_max_quant, sales.state as _1_state
+from sales, q1
+where sales.cust = q1.cust and sales.prod= q1.prod and sales.quant = q1.max_quant
+),q3 as (
+	select cust, prod, max(quant) max_quant
+from sales
+where year = 2018
+group by cust, prod
+),
+q4 as(
+select q3.cust, q3.prod, q3.max_quant as _2_max_quant, sales.state as _2_state
+from sales, q3
+where sales.cust = q3.cust and sales.prod= q3.prod and sales.quant = q3.max_quant
+),q5 as (
+	select cust, prod, max(quant) max_quant
+from sales
+where year = 2019
+group by cust, prod
+),
+q6 as(
+select q5.cust, q5.prod, q5.max_quant as _3_max_quant, sales.state as _3_state
+from sales, q5
+where sales.cust = q5.cust and sales.prod= q5.prod and sales.quant = q5.max_quant
+)
+
+
+select * from q2 natural join q4 natural join q6

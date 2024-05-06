@@ -39,6 +39,35 @@ def query():
             if '2_max_quant' not in mf_structure[(group_cust)] or row[6] > mf_structure[(group_cust)]['2_max_quant']:
                 mf_structure[(group_cust)]['2_max_quant'] = row[6]
             mf_structure[(group_cust)]['2.prod'] = row[1]
+    # second scan
+    mf_structure_0 = collections.defaultdict(H)
+    for row in rows:
+        group_cust = row[0]
+        if row[6] == mf_structure[((group_cust))]['1_max_quant']:
+            if not (mf_structure_0[(group_cust)]['cust']):
+                mf_structure_0[(group_cust)]['cust'] = group_cust
+            if '1_max_quant' not in mf_structure_0[(group_cust)] or row[6] > mf_structure_0[(group_cust)]['1_max_quant']:
+                mf_structure_0[(group_cust)]['1_max_quant'] = row[6]
+            mf_structure_0[(group_cust)]['1.prod'] = row[1]
+    for row in rows:
+        group_cust = row[0]
+        if row[6] == mf_structure[((group_cust))]['2_max_quant']:
+            if not (mf_structure_0[(group_cust)]['cust']):
+                mf_structure_0[(group_cust)]['cust'] = group_cust
+            if '2_max_quant' not in mf_structure_0[(group_cust)] or row[6] > mf_structure_0[(group_cust)]['2_max_quant']:
+                mf_structure_0[(group_cust)]['2_max_quant'] = row[6]
+            mf_structure_0[(group_cust)]['2.prod'] = row[1]
+    
+
+    for key, updated_h_object in mf_structure_0.items():
+        if key in mf_structure:
+            original_h_object = mf_structure[key]
+            for attr, value in updated_h_object.attributes.items():
+                if value != 0:
+                    original_h_object.attributes[attr] = value
+        else:
+            mf_structure[key] = updated_h_object
+        
     x = PrettyTable()
     x.field_names = ['cust','1.prod','2.prod']
     for val in mf_structure.values():

@@ -1,0 +1,14 @@
+with q1 as(
+select cust, sum(quant) as _2_sum_quant, avg(quant) as _2_avg_quant
+from sales
+where state = 'NJ'
+group by cust
+),
+q2 as(
+select sales.cust, sum(sales.quant) as _1_sum_quant, avg(sales.quant) as _1_avg_quant
+from sales, q1
+where sales.cust = q1.cust and sales.state='NY' and sales.quant>=q1._2_avg_quant
+group by sales.cust
+)
+
+select * from q2 natural join q1
