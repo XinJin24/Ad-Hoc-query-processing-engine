@@ -1,0 +1,23 @@
+with q1 as(
+select cust, sum(quant) as _1_sum_quant, avg(quant) as _1_avg_quant
+from sales
+where sales.state = 'NY'
+group by cust
+), q2 as(
+select cust, sum(quant) as _2_sum_quant, avg(quant) as _2_avg_quant
+from sales
+where sales.state = 'NJ'
+group by cust
+), q3 as (
+select cust, sum(quant) as _3_sum_quant, avg(quant) as _3_avg_quant
+from sales
+where sales.state = 'CT'
+group by cust
+)
+
+select * from q1 natural join q2 natural join q3
+
+
+
+
+

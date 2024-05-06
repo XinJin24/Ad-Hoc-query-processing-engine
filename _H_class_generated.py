@@ -3,13 +3,8 @@ class H:
         self.attributes = {}
         self.attributes['cust'] = None
         self.attributes['1_sum_quant'] = 0
-        self.attributes['1_avg_quant'] = 0
-        self.attributes['1_max_quant'] = 0
-        self.attributes['1_min_quant'] = 10000
         self.attributes['2_sum_quant'] = 0
-        self.attributes['2_avg_quant'] = 0
         self.attributes['3_sum_quant'] = 0
-        self.attributes['3_avg_quant'] = 0
 
     def __getitem__(self, key):
         return self.attributes.get(key, None)

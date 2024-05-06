@@ -3,8 +3,10 @@ import re
 
 
 def read_arguments_from_file():
-    # file_path = input("Enter the file path: ")
-    file_path = r"C:\Users\jinxi\git_repos\Ad-Hoc-query-processing-engine\input1.txt"
+    file_path = input("which file to run? ")
+    base_path = r"C:\Users\jinxi\git_repos\Ad-Hoc-query-processing-engine\\"
+
+    file_path = base_path + file_path
     try:
         with open(file_path, 'r', encoding='utf-8') as file:
             content = file.readlines()
@@ -28,9 +30,7 @@ def read_arguments_from_file():
                 elements = [element.strip() for element in line.split(',')]
                 parsed_data[current_key].extend(elements)
 
-        if any(len(parsed_data[key]) == 0 for key in keys):
-            raise ValueError("Some keys are missing data.")
-
+        print(parsed_data)
         return parsed_data
 
     except FileNotFoundError:
@@ -50,24 +50,35 @@ def read_arguments_from_file():
 def get_arguments_manually():
     print("Please enter the 6 arguments for the Phi Operator:")
     return {
-        'SELECT_ATTRIBUTE(S)': input("Enter SELECT ATTRIBUTE(S) (e.g., cust, 1_sum_quant, 2_sum_quant, 3_sum_quant): "),
-        'NUMBER_OF_GROUPING_VARIABLES(n)': input("Enter NUMBER OF GROUPING VARIABLES(n) (e.g., 3): "),
-        'GROUPING_ATTRIBUTES(V)': input("Enter GROUPING ATTRIBUTES(V) (e.g., cust): "),
-        'F-VECT([F])': input(
-            "Enter F-VECT([F]) (e.g., 1_sum_quant, 1_avg_quant, 2_sum_quant, 3_sum_quant, 3_avg_quant): "),
-        'SELECT_CONDITION-VECT([σ])': input(
-            "Enter SELECT CONDITION-VECT([σ]) (e.g., 1.state='NY', 2.state='NJ', 3.state='CT'): "),
-        'HAVING_CONDITION(G)': input(
-            "Enter HAVING_CONDITION(G) (e.g., 1_sum_quant > 2 * 2_sum_quant or 1_avg_quant > 3_avg_quant): ")
+        'SELECT ATTRIBUTE(S):': input("Enter SELECT ATTRIBUTE(S): "),
+        'NUMBER OF GROUPING VARIABLES(n):': input("Enter NUMBER OF GROUPING VARIABLES(n): "),
+        'GROUPING ATTRIBUTES(V):': input("Enter GROUPING ATTRIBUTES(V): "),
+        'F-VECT([F]):': input(
+            "Enter F-VECT([F]): "),
+        'SELECT CONDITION-VECT([σ]):': input(
+            "Enter SELECT CONDITION-VECT([σ]): "),
+        'HAVING_CONDITION(G):': input(
+            "Enter HAVING_CONDITION(G): ")
     }
 
+def to_clean_list(item, delimiter=','):
+    items = [element.strip() for element in item.split(delimiter) if element.strip()]
+    return items
 
 def get_phi_operator_arguments():
     choice = input("Do you want to enter arguments manually or from a file? (Type 'manual' or 'file'): ").lower()
     if choice == 'file':
         return read_arguments_from_file()
     elif choice == 'manual':
-        return get_arguments_manually()
+        parsed_data = {}
+        inputText = get_arguments_manually()
+        for key, value in inputText.items():
+            if(key == 'HAVING_CONDITION(G):'):
+                parsed_data[key] = [value.strip()]
+            else:
+                delimiter = ',' if ',' in value else ' '
+                parsed_data[key] = to_clean_list(value, delimiter)
+        return parsed_data
     else:
         print("Invalid choice. Please enter 'manual' or 'file'.")
         return get_phi_operator_arguments()
@@ -662,6 +673,7 @@ if "__main__" == __name__:
     indentation = "    "
     schema_indices = {'cust': 0, 'prod': 1, 'day': 2, 'month': 3, 'year': 4, 'state': 5, 'quant': 6, 'date': 7}
     phi_arguments = step1()
+    print(phi_arguments)
     grouping_attributes = phi_arguments['GROUPING ATTRIBUTES(V):']
     aggregate_functions = phi_arguments['F-VECT([F]):']
     select_conditions = phi_arguments['SELECT CONDITION-VECT([σ]):']
