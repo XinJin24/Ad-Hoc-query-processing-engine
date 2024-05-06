@@ -2,8 +2,10 @@ class H:
     def __init__(self):
         self.attributes = {}
         self.attributes['cust'] = None
+        self.attributes['prod'] = None
         self.attributes['1_max_quant'] = 0
         self.attributes['2_max_quant'] = 0
+        self.attributes['3_max_quant'] = 0
 
     def __getitem__(self, key):
         return self.attributes.get(key, None)

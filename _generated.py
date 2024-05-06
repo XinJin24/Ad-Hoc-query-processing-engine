@@ -27,36 +27,60 @@ def query():
     mf_structure = collections.defaultdict(H)
     for row in rows:
         group_cust = row[0]
+        group_prod = row[1]
+        if row[4] == 2017:
+            if not (mf_structure[(group_cust, group_prod)]['cust'] and mf_structure[(group_cust, group_prod)]['prod']):
+                mf_structure[(group_cust, group_prod)]['cust'] = group_cust
+                mf_structure[(group_cust, group_prod)]['prod'] = group_prod
+            if '1_max_quant' not in mf_structure[(group_cust, group_prod)] or row[6] > mf_structure[(group_cust, group_prod)]['1_max_quant']:
+                mf_structure[(group_cust, group_prod)]['1_max_quant'] = row[6]
+            mf_structure[(group_cust, group_prod)]['1.state'] = row[5]
         if row[4] == 2018:
-            if not (mf_structure[(group_cust)]['cust']):
-                mf_structure[(group_cust)]['cust'] = group_cust
-            if '1_max_quant' not in mf_structure[(group_cust)] or row[6] > mf_structure[(group_cust)]['1_max_quant']:
-                mf_structure[(group_cust)]['1_max_quant'] = row[6]
-            mf_structure[(group_cust)]['1.prod'] = row[1]
-        if row[4] != 2018:
-            if not (mf_structure[(group_cust)]['cust']):
-                mf_structure[(group_cust)]['cust'] = group_cust
-            if '2_max_quant' not in mf_structure[(group_cust)] or row[6] > mf_structure[(group_cust)]['2_max_quant']:
-                mf_structure[(group_cust)]['2_max_quant'] = row[6]
-            mf_structure[(group_cust)]['2.prod'] = row[1]
+            if not (mf_structure[(group_cust, group_prod)]['cust'] and mf_structure[(group_cust, group_prod)]['prod']):
+                mf_structure[(group_cust, group_prod)]['cust'] = group_cust
+                mf_structure[(group_cust, group_prod)]['prod'] = group_prod
+            if '2_max_quant' not in mf_structure[(group_cust, group_prod)] or row[6] > mf_structure[(group_cust, group_prod)]['2_max_quant']:
+                mf_structure[(group_cust, group_prod)]['2_max_quant'] = row[6]
+            mf_structure[(group_cust, group_prod)]['2.state'] = row[5]
+        if row[4] == 2019:
+            if not (mf_structure[(group_cust, group_prod)]['cust'] and mf_structure[(group_cust, group_prod)]['prod']):
+                mf_structure[(group_cust, group_prod)]['cust'] = group_cust
+                mf_structure[(group_cust, group_prod)]['prod'] = group_prod
+            if '3_max_quant' not in mf_structure[(group_cust, group_prod)] or row[6] > mf_structure[(group_cust, group_prod)]['3_max_quant']:
+                mf_structure[(group_cust, group_prod)]['3_max_quant'] = row[6]
+            mf_structure[(group_cust, group_prod)]['3.state'] = row[5]
     # second scan
     mf_structure_0 = collections.defaultdict(H)
     for row in rows:
         group_cust = row[0]
-        if row[6] == mf_structure[((group_cust))]['1_max_quant']:
-            if not (mf_structure_0[(group_cust)]['cust']):
-                mf_structure_0[(group_cust)]['cust'] = group_cust
-            if '1_max_quant' not in mf_structure_0[(group_cust)] or row[6] > mf_structure_0[(group_cust)]['1_max_quant']:
-                mf_structure_0[(group_cust)]['1_max_quant'] = row[6]
-            mf_structure_0[(group_cust)]['1.prod'] = row[1]
+        group_prod = row[1]
+        if row[6] == mf_structure[((group_cust, group_prod))]['1_max_quant']:
+            if not (mf_structure_0[(group_cust, group_prod)]['cust'] and mf_structure_0[(group_cust, group_prod)]['prod']):
+                mf_structure_0[(group_cust, group_prod)]['cust'] = group_cust
+                mf_structure_0[(group_cust, group_prod)]['prod'] = group_prod
+            if '1_max_quant' not in mf_structure_0[(group_cust, group_prod)] or row[6] > mf_structure_0[(group_cust, group_prod)]['1_max_quant']:
+                mf_structure_0[(group_cust, group_prod)]['1_max_quant'] = row[6]
+            mf_structure_0[(group_cust, group_prod)]['1.state'] = row[5]
     for row in rows:
         group_cust = row[0]
-        if row[6] == mf_structure[((group_cust))]['2_max_quant']:
-            if not (mf_structure_0[(group_cust)]['cust']):
-                mf_structure_0[(group_cust)]['cust'] = group_cust
-            if '2_max_quant' not in mf_structure_0[(group_cust)] or row[6] > mf_structure_0[(group_cust)]['2_max_quant']:
-                mf_structure_0[(group_cust)]['2_max_quant'] = row[6]
-            mf_structure_0[(group_cust)]['2.prod'] = row[1]
+        group_prod = row[1]
+        if row[6] == mf_structure[((group_cust, group_prod))]['2_max_quant']:
+            if not (mf_structure_0[(group_cust, group_prod)]['cust'] and mf_structure_0[(group_cust, group_prod)]['prod']):
+                mf_structure_0[(group_cust, group_prod)]['cust'] = group_cust
+                mf_structure_0[(group_cust, group_prod)]['prod'] = group_prod
+            if '2_max_quant' not in mf_structure_0[(group_cust, group_prod)] or row[6] > mf_structure_0[(group_cust, group_prod)]['2_max_quant']:
+                mf_structure_0[(group_cust, group_prod)]['2_max_quant'] = row[6]
+            mf_structure_0[(group_cust, group_prod)]['2.state'] = row[5]
+    for row in rows:
+        group_cust = row[0]
+        group_prod = row[1]
+        if row[6] == mf_structure[((group_cust, group_prod))]['3_max_quant']:
+            if not (mf_structure_0[(group_cust, group_prod)]['cust'] and mf_structure_0[(group_cust, group_prod)]['prod']):
+                mf_structure_0[(group_cust, group_prod)]['cust'] = group_cust
+                mf_structure_0[(group_cust, group_prod)]['prod'] = group_prod
+            if '3_max_quant' not in mf_structure_0[(group_cust, group_prod)] or row[6] > mf_structure_0[(group_cust, group_prod)]['3_max_quant']:
+                mf_structure_0[(group_cust, group_prod)]['3_max_quant'] = row[6]
+            mf_structure_0[(group_cust, group_prod)]['3.state'] = row[5]
     
 
     for key, updated_h_object in mf_structure_0.items():
@@ -69,7 +93,7 @@ def query():
             mf_structure[key] = updated_h_object
         
     x = PrettyTable()
-    x.field_names = ['cust','1.prod','2.prod']
+    x.field_names = ['cust','prod','1_max_quant','1.state','2_max_quant','2.state','3_max_quant','3.state']
     for val in mf_structure.values():
             row = [val[key] for key in x.field_names if key in val]
             x.add_row(row)

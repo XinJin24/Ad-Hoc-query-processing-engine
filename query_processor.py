@@ -30,7 +30,6 @@ def read_arguments_from_file():
                 elements = [element.strip() for element in line.split(',')]
                 parsed_data[current_key].extend(elements)
 
-        print(parsed_data)
         return parsed_data
 
     except FileNotFoundError:
@@ -673,7 +672,6 @@ if "__main__" == __name__:
     indentation = "    "
     schema_indices = {'cust': 0, 'prod': 1, 'day': 2, 'month': 3, 'year': 4, 'state': 5, 'quant': 6, 'date': 7}
     phi_arguments = step1()
-    print(phi_arguments)
     grouping_attributes = phi_arguments['GROUPING ATTRIBUTES(V):']
     aggregate_functions = phi_arguments['F-VECT([F]):']
     select_conditions = phi_arguments['SELECT CONDITION-VECT([σ]):']
