@@ -8,6 +8,6 @@ F-VECT([F]):
 1_sum_quant, 1_avg_quant, 2_sum_quant, 2_avg_quant
 SELECT CONDITION-VECT([σ]):
 1.state='NY'
-1.quant>=2_avg_quant
 2.state=’NJ’
+1.quant>=2_avg_quant
 HAVING_CONDITION(G):
